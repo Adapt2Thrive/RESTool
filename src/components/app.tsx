@@ -12,6 +12,7 @@ import inTreeConfig from "../config";
 
 import './app.scss';
 import 'react-toastify/dist/ReactToastify.css';
+import { getUserAndTokenOrRedirectToLogin } from '../services/auth0-service';
 
 const httpService = new HttpService();
 const defaultAppName: string = 'RESTool App';
@@ -35,7 +36,13 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const appName: string = config?.name || defaultAppName;
 
-  async function loadConfig(url?: string): Promise<void> {
+  async function loadConfig({
+    url,
+    token,
+  }: {
+    url?: string;
+    token?: string;
+  }): Promise<void> {
     try {
       let itConfig = inTreeConfig();
       if (itConfig) (window as any).RESTool = { config: itConfig };
@@ -46,6 +53,12 @@ function App() {
         remoteConfig = Object.assign({}, windowConfig, {});
       } else {
         remoteConfig = url ? await ConfigService.getRemoteConfig(url) : await ConfigService.loadDefaultConfig();
+      }
+
+      if (token) {
+        remoteConfig.requestHeaders = {
+          Authorization: `Bearer ${token}`,
+        };
       }
 
       // Setting global config for httpService
@@ -60,7 +73,7 @@ function App() {
       }
 
       if (remoteConfig?.remoteUrl) {
-        return await loadConfig(remoteConfig.remoteUrl);
+        return await loadConfig({ url: remoteConfig.remoteUrl });
       }
 
       setConfig(remoteConfig);
@@ -96,7 +109,10 @@ function App() {
   }
 
   useEffect(() => {
-    loadConfig();
+    (async () => {
+      const { token } = (await getUserAndTokenOrRedirectToLogin()) || {};
+      loadConfig({ token });
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
